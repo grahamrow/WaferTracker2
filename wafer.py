@@ -33,6 +33,7 @@ class MainApp(QtGui.QMainWindow):
 
 		# Die Inspector
 		self.dieInspector.dieAnnealTemp.valueChanged.connect(self.changeDieTemp)
+		self.dieInspector.dieAnnealTemp.valueChanged.connect(self.waferDisplay.repaint)
 		self.dieInspector.dieAnnealTime.valueChanged.connect(self.changeDieTime)
 		self.dieInspector.dieNotes.textChanged.connect(self.changeDieNotes)
 
@@ -42,12 +43,15 @@ class MainApp(QtGui.QMainWindow):
 		self.sampleInspector.sampleDimensions.textChanged.connect(self.changeSampleDimensions)
 		self.sampleInspector.sampleNotes.textChanged.connect(self.changeSampleNotes)
 		self.sampleInspector.sampleState.currentIndexChanged.connect(self.changeSampleState)
+		self.sampleInspector.sampleState.currentIndexChanged.connect(self.waferDisplay.repaint)
+
 		# Inspected State, which we rely upon to point to the correct object
-		self.currentSelection = self.waferDisplay.waf
+		self.setCurrentSelection(self.waferDisplay.waf)
 
 		self.ui.show()
 
-		
+	def getCurrentSelection(self):
+		return self.currentSelection
 
 	def setCurrentSelection(self, selection):
 		"""Set the correct inspector"""
@@ -74,6 +78,7 @@ class MainApp(QtGui.QMainWindow):
 		else:
 			print "Invalid Inspector"
 			raise 
+		self.waferDisplay.repaint()
 
 	#------------------------------------------------------------------
 	# Methods for setting the object data from the inspectors
@@ -117,7 +122,6 @@ class DrawWafer(QtGui.QWidget):
 		sizePolicy.setHeightForWidth(True)
 		sizePolicy.setWidthForHeight(True)
 		self.setSizePolicy(sizePolicy)
-		self.thingy = 12342349.0
 		self.waf = Wafer(5,5,5,8, controller=self.controller, parent=self)
 
 	def sizeHint(self):
@@ -181,9 +185,18 @@ class Wafer(QtGui.QWidget):
 		
 		# Draw the actual wafer
 		radius = diameter*0.5
-		paint.setPen(QtCore.Qt.black)
-		paint.setBrush(QtGui.QColor(220, 220, 220))
 		boundingRect = QtCore.QRectF(-radius, -radius, diameter, diameter)
+		grad = QtGui.QLinearGradient(-radius, -radius, radius, radius)
+		grad.setColorAt(.75, QtGui.QColor(253, 210, 255))
+		grad.setColorAt(.5, QtGui.QColor(217, 226, 255))
+		grad.setColorAt(.25, QtGui.QColor(191, 255, 255))
+		paint.setBrush(grad)
+		if self.controller.getCurrentSelection() == self:
+			thickness = 2
+		else:
+			thickness = 1
+		pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
+		paint.setPen(pen)
 		paint.drawChord(boundingRect, 290*16, 320*16)
 
 		# Draw the dies
@@ -196,7 +209,9 @@ class Wafer(QtGui.QWidget):
 				transX = (j-0.5*(self.dieCols-1))*(self.sizeX+self.dieMargin)
 				transY = (i-0.5*(self.dieRows-1))*(self.sizeY+self.dieMargin)
 				paint.save()
-				paint.translate(transX, transY)
+				paint.translate(transX, -transY)
+				paint.setBrush(QtCore.Qt.NoBrush)
+				paint.setPen(QtCore.Qt.black)
 				die.draw(paint, self.sizeX, self.sizeY)
 				paint.restore()
 
@@ -239,6 +254,12 @@ class Die(QtGui.QWidget):
 		# Draw the die
 		self.sizeX = sizeX
 		self.sizeY = sizeY
+		if self.controller.getCurrentSelection() == self:
+			thickness = 2
+		else:
+			thickness = 1
+		pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
+		paint.setPen(pen)
 		paint.drawRect(-0.5*self.sizeX,-0.5*self.sizeY, self.sizeX, self.sizeY)
 
 		# Draw the devices
@@ -250,7 +271,7 @@ class Die(QtGui.QWidget):
 				transX = (j-0.5*(self.sampleCols-1))*(self.sizeX+self.sampleMargin)
 				transY = (i-0.5*(self.sampleRows-1))*(self.sizeY+self.sampleMargin)
 				paint.save()
-				paint.translate(transX, transY)
+				paint.translate(transX, -transY)
 				dev.draw(paint, self.sizeX, self.sizeY)
 				paint.restore()
 
@@ -286,6 +307,24 @@ class Sample(QtGui.QWidget):
 	def draw(self, paint, sizeX, sizeY):
 		self.sizeX = sizeX
 		self.sizeY = sizeY
+
+		if self.state == 1:
+			brush = QtGui.QColor(100, 100, 100)
+		elif self.state == 2:
+			brush = QtGui.QColor(0, 100, 255)
+		elif self.state == 3:
+			brush = QtGui.QColor(0, 255, 100)
+		elif self.state == 4:
+			brush = QtGui.QColor(255, 50, 50)
+		else:
+			brush = QtCore.Qt.NoBrush
+		paint.setBrush(brush)
+		if self.controller.getCurrentSelection() == self:
+			thickness = 2
+		else:
+			thickness = 1
+		pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
+		paint.setPen(pen)
 		paint.drawRect(-0.5*self.sizeX,-0.5*self.sizeY, self.sizeX, self.sizeY)
 
 if __name__ == "__main__":
