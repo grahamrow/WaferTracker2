@@ -23,6 +23,20 @@ class MainApp(QtGui.QMainWindow):
 		self.ui.splitter.addWidget(self.inspectorStack)
 
 		#------------------------------------------------------------------
+		# Display state
+		#------------------------------------------------------------------
+		self.showSamples = 1
+		self.showAnnealing = 0
+
+		#------------------------------------------------------------------
+		# Connect general interface ports
+		#------------------------------------------------------------------
+		self.ui.showSamples.stateChanged.connect(self.setShowSamples)
+		self.ui.showAnnealing.stateChanged.connect(self.setShowAnnealing)
+		self.ui.showSamples.stateChanged.connect(self.waferDisplay.repaint)
+		self.ui.showAnnealing.stateChanged.connect(self.waferDisplay.repaint)
+
+		#------------------------------------------------------------------
 		# Connect the relevant ports to methods for setting object data
 		#------------------------------------------------------------------
            
@@ -111,6 +125,15 @@ class MainApp(QtGui.QMainWindow):
 		self.currentSelection.dimensions = string
 	def changeSampleState(self, value):
 		self.currentSelection.state = value
+
+	def setShowSamples(self, value):
+		self.showSamples = value
+	def setShowAnnealing(self, value):
+		self.showAnnealing = value
+	def showingSamples(self):
+		return self.showSamples
+	def showingAnnealing(self):
+		return self.showAnnealing
 
 class DrawWafer(QtGui.QWidget):
 	def __init__(self, controller, parent=None):
@@ -244,7 +267,7 @@ class Die(QtGui.QWidget):
 
 		# Actual Values
 		self.notes        = ""
-		self.annealTemp   = 175.0
+		self.annealTemp   = 0.0
 		self.annealTime   = 0.0
 
 	def name(self):
@@ -260,6 +283,14 @@ class Die(QtGui.QWidget):
 			thickness = 1
 		pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
 		paint.setPen(pen)
+		if self.annealTemp > 150 and self.controller.showingAnnealing():
+			brush = QtGui.QColor()
+			temp = self.annealTemp
+			if temp > 600.0:
+				temp = 600.0
+
+			brush.setHsvF(0.75 + 0.25*temp/600.0, 1.0, 1.0)
+			paint.setBrush(brush)
 		paint.drawRect(-0.5*self.sizeX,-0.5*self.sizeY, self.sizeX, self.sizeY)
 
 		# Draw the devices
@@ -276,14 +307,15 @@ class Die(QtGui.QWidget):
 				paint.restore()
 
 	def checkMousePressEvent(self, eventX, eventY):
-		for i, row in enumerate(self.samples):
-			for j, die in enumerate(row):
-				transX = (j-0.5*(self.sampleCols-1))*(self.sizeX+self.sampleMargin)
-				transY = (i-0.5*(self.sampleRows-1))*(self.sizeY+self.sampleMargin)
-				if (-0.5*self.sizeX <= eventX-transX <= 0.5*self.sizeX):
-					if (-0.5*self.sizeY <= eventY-transY <= 0.5*self.sizeY):
-						self.controller.setCurrentSelection(self.samples[i][j])
-						return True
+		if self.controller.showingSamples():
+			for i, row in enumerate(self.samples):
+				for j, die in enumerate(row):
+					transX = (j-0.5*(self.sampleCols-1))*(self.sizeX+self.sampleMargin)
+					transY = (i-0.5*(self.sampleRows-1))*(self.sizeY+self.sampleMargin)
+					if (-0.5*self.sizeX <= eventX-transX <= 0.5*self.sizeX):
+						if (-0.5*self.sizeY <= eventY-transY <= 0.5*self.sizeY):
+							self.controller.setCurrentSelection(self.samples[i][j])
+							return True
 		return False
 
 class Sample(QtGui.QWidget):
@@ -308,24 +340,25 @@ class Sample(QtGui.QWidget):
 		self.sizeX = sizeX
 		self.sizeY = sizeY
 
-		if self.state == 1:
-			brush = QtGui.QColor(100, 100, 100)
-		elif self.state == 2:
-			brush = QtGui.QColor(0, 100, 255)
-		elif self.state == 3:
-			brush = QtGui.QColor(0, 255, 100)
-		elif self.state == 4:
-			brush = QtGui.QColor(255, 50, 50)
-		else:
-			brush = QtCore.Qt.NoBrush
-		paint.setBrush(brush)
-		if self.controller.getCurrentSelection() == self:
-			thickness = 2
-		else:
-			thickness = 1
-		pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
-		paint.setPen(pen)
-		paint.drawRect(-0.5*self.sizeX,-0.5*self.sizeY, self.sizeX, self.sizeY)
+		if self.controller.showingSamples():
+			if self.state == 1:
+				brush = QtGui.QColor(100, 100, 100)
+			elif self.state == 2:
+				brush = QtGui.QColor(0, 100, 255)
+			elif self.state == 3:
+				brush = QtGui.QColor(0, 255, 100)
+			elif self.state == 4:
+				brush = QtGui.QColor(255, 50, 50)
+			else:
+				brush = QtGui.QColor(250, 250, 250)
+			paint.setBrush(brush)
+			if self.controller.getCurrentSelection() == self:
+				thickness = 2
+			else:
+				thickness = 1
+			pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
+			paint.setPen(pen)
+			paint.drawRect(-0.5*self.sizeX,-0.5*self.sizeY, self.sizeX, self.sizeY)
 
 if __name__ == "__main__":
 	app = QtGui.QApplication(sys.argv)

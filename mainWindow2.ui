@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>784</width>
-    <height>717</height>
+    <height>644</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -40,16 +40,19 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
-       <widget class="QCheckBox" name="checkBox">
+       <widget class="QCheckBox" name="showSamples">
         <property name="text">
-         <string>Status</string>
+         <string>Show Samples</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="checkBox_2">
+       <widget class="QCheckBox" name="showAnnealing">
         <property name="text">
-         <string>Annealing</string>
+         <string>Show Annealing</string>
         </property>
        </widget>
       </item>
