@@ -44,7 +44,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QComboBox" name="comboBox">
+    <widget class="QComboBox" name="sampleState">
      <item>
       <property name="text">
        <string>Untested</string>
@@ -83,7 +83,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QDoubleSpinBox" name="dieAnnealTime">
+    <widget class="QDoubleSpinBox" name="sampleResLong">
      <property name="singleStep">
       <double>0.500000000000000</double>
      </property>
@@ -100,7 +100,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QDoubleSpinBox" name="dieAnnealTime_2">
+    <widget class="QDoubleSpinBox" name="sampleResTrans">
      <property name="singleStep">
       <double>0.500000000000000</double>
      </property>
