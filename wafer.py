@@ -1,5 +1,6 @@
 import sys
 from PyQt4 import QtGui, QtCore, uic
+import xml.etree.cElementTree as et
 
 class MainApp(QtGui.QMainWindow):
 	def __init__(self):
@@ -21,20 +22,32 @@ class MainApp(QtGui.QMainWindow):
 		self.ui.splitter.addWidget(self.waferDisplay)
 		self.ui.splitter.addWidget(self.inspectorStack)
 
-		# Connect the relevant ports
+		#------------------------------------------------------------------
+		# Connect the relevant ports to methods for setting object data
+		#------------------------------------------------------------------
+           
+		# Wafer Inspector
 		self.waferInspector.waferName.textChanged.connect(self.changeWaferName)
 		self.waferInspector.waferSubstrate.textChanged.connect(self.changeWaferSubstrate)
 		self.waferInspector.waferNotes.textChanged.connect(self.changeWaferNotes)
 
+		# Die Inspector
 		self.dieInspector.dieAnnealTemp.valueChanged.connect(self.changeDieTemp)
 		self.dieInspector.dieAnnealTime.valueChanged.connect(self.changeDieTime)
 		self.dieInspector.dieNotes.textChanged.connect(self.changeDieNotes)
 
-		#self.ui.splitter.widget(1).dieAnnealTime.valueChanged.connect(self.ui.splitter.widget(1).dieAnnealTemp.setValue)
+		# Sample Inspector
+		self.sampleInspector.sampleResLong.valueChanged.connect(self.changeSampleResLong)
+		self.sampleInspector.sampleResTrans.valueChanged.connect(self.changeSampleResTrans)
+		self.sampleInspector.sampleDimensions.textChanged.connect(self.changeSampleDimensions)
+		self.sampleInspector.sampleNotes.textChanged.connect(self.changeSampleNotes)
+		self.sampleInspector.sampleState.currentIndexChanged.connect(self.changeSampleState)
+		# Inspected State, which we rely upon to point to the correct object
+		self.currentSelection = self.waferDisplay.waf
+
 		self.ui.show()
 
-		# Inspected State
-		self.currentSelection = self.waferDisplay.waf
+		
 
 	def setCurrentSelection(self, selection):
 		"""Set the correct inspector"""
@@ -47,18 +60,34 @@ class MainApp(QtGui.QMainWindow):
 			self.dieInspector.dieName.setText("Row %d, Col %d" % (self.currentSelection.row+1, self.currentSelection.col+1))
 		elif isinstance(self.currentSelection, Wafer):
 			self.inspectorStack.setCurrentIndex(0)
+			self.waferInspector.waferName.setText(self.currentSelection.name)
+			self.waferInspector.waferSubstrate.setText(self.currentSelection.substrate)
+			self.waferInspector.waferNotes.setText(self.currentSelection.notes)
 		elif isinstance(self.currentSelection, Sample):
 			self.inspectorStack.setCurrentIndex(2)
+			self.sampleInspector.sampleResTrans.setValue(self.currentSelection.resTrans)
+			self.sampleInspector.sampleResLong.setValue(self.currentSelection.resLong)
+			self.sampleInspector.sampleState.setCurrentIndex(self.currentSelection.state)
+			self.sampleInspector.sampleName.setText("Die Row %d, Col %d : Sample Row %d, Col %d" % (self.currentSelection.parentRow+1, self.currentSelection.parentCol+1, self.currentSelection.row+1, self.currentSelection.col+1))
+			self.sampleInspector.sampleNotes.setText(self.currentSelection.notes)
+			self.sampleInspector.sampleDimensions.setText(self.currentSelection.dimensions)
 		else:
 			print "Invalid Inspector"
 			raise 
 
+	#------------------------------------------------------------------
+	# Methods for setting the object data from the inspectors
+	#------------------------------------------------------------------
+
+	# Wafer
 	def changeWaferName(self, string):
 		self.currentSelection.name = string
 	def changeWaferSubstrate(self, string):
 		self.currentSelection.substrate = string
 	def changeWaferNotes(self):
 		self.currentSelection.notes = self.waferInspector.waferNotes.toPlainText()
+	
+	# Die
 	def changeDieTemp(self, value):
 		self.currentSelection.annealTemp = value
 	def changeDieTime(self, value):
@@ -66,11 +95,22 @@ class MainApp(QtGui.QMainWindow):
 	def changeDieNotes(self):
 		self.currentSelection.notes = self.dieInspector.dieNotes.toPlainText()
 
+	# Sample
+	def changeSampleResLong(self, value):
+		self.currentSelection.resLong = value
+	def changeSampleResTrans(self, value):
+		self.currentSelection.resTrans = value
+	def changeSampleNotes(self):
+		self.currentSelection.notes = self.sampleInspector.sampleNotes.toPlainText()
+	def changeSampleDimensions(self, string):
+		self.currentSelection.dimensions = string
+	def changeSampleState(self, value):
+		self.currentSelection.state = value
+
 class DrawWafer(QtGui.QWidget):
 	def __init__(self, controller, parent=None):
 		QtGui.QWidget.__init__(self, parent)
 		self.controller = controller
-		# setGeometry(x_pos, y_pos, width, height)
 		self.setGeometry(300, 300, 350, 350)
 		self.setWindowTitle('Draw circles')
 		sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
@@ -119,11 +159,8 @@ class DrawWafer(QtGui.QWidget):
 
 	def mousePressEvent(self, event):
 		super(DrawWafer, self).mousePressEvent(event)
-		#print "Mouse press in main area:",  event.button(), event.pos()
-		#self.parent().widget(1).dieNotes.setText("Coords %f,%f" % (event.x(), event.y()))
 		position = QtCore.QPointF(event.pos())
 		if not self.waf.checkMousePressEvent(event, self.centerX, self.centerY):
-			#print "Click within wafer"
 			self.controller.setCurrentSelection(self.waf)
 
 class Wafer(QtGui.QWidget):
@@ -171,11 +208,9 @@ class Wafer(QtGui.QWidget):
 				transX = (j-0.5*(self.dieCols-1))*(self.sizeX+self.dieMargin)
 				transY = (i-0.5*(self.dieRows-1))*(self.sizeY+self.dieMargin)
 				if (-0.5*self.sizeX <= eventX-transX <= 0.5*self.sizeX):
-					#print "Within die %d,%d column" % (i,j)
 					if (-0.5*self.sizeY <= eventY-transY <= 0.5*self.sizeY):
 						# Check to see if we hit a die too
 						if not self.dies[i][j].checkMousePressEvent(eventX-transX, eventY-transY):
-							#print "Click within die %d,%d" % (i+1,j+1)
 							self.controller.setCurrentSelection(self.dies[i][j])
 						# Return true if we hit anything
 						return True
@@ -190,7 +225,7 @@ class Die(QtGui.QWidget):
 		self.sampleCols   = sampleCols
 		self.row          = thisRow
 		self.col          = thisCol
-		self.samples      = [[Sample(i, j, sampleRows, sampleCols, controller=self.controller) for j in range(sampleCols)] for i in range(sampleRows)]
+		self.samples      = [[Sample(i, j, thisRow, thisCol, controller=self.controller, parent=self) for j in range(sampleCols)] for i in range(sampleRows)]
 
 		# Actual Values
 		self.notes        = ""
@@ -199,6 +234,7 @@ class Die(QtGui.QWidget):
 
 	def name(self):
 		return "Die(%d,%d)" % (self.row, self.col)
+
 	def draw(self, paint, sizeX, sizeY):
 		# Draw the die
 		self.sizeX = sizeX
@@ -223,11 +259,8 @@ class Die(QtGui.QWidget):
 			for j, die in enumerate(row):
 				transX = (j-0.5*(self.sampleCols-1))*(self.sizeX+self.sampleMargin)
 				transY = (i-0.5*(self.sampleRows-1))*(self.sizeY+self.sampleMargin)
-				#print "Checking for samples", eventX, eventY, transX, transY
 				if (-0.5*self.sizeX <= eventX-transX <= 0.5*self.sizeX):
-					#print "Within die %d,%d column" % (i,j)
 					if (-0.5*self.sizeY <= eventY-transY <= 0.5*self.sizeY):
-						#print "Click within sample %d,%d die %d,%d" % (i+1,j+1,self.row+1,self.col+1)
 						self.controller.setCurrentSelection(self.samples[i][j])
 						return True
 		return False
@@ -242,15 +275,18 @@ class Sample(QtGui.QWidget):
 		self.parentCol = parentCol
 
 		self.notes        = ""
+		self.dimensions   = ""
+		self.resTrans     = 0
+		self.resLong      = 0
+		self.state        = 0
+
 	def name(self):
 		return "Die(%d,%d) Sample(%d,%d)" % (self.parentRow, self.parentCol, self.row, self.col)
-	# def mousePressEvent(self, event):
-	# 	print "Mouse press:",  event.button(), int(event.buttons()), self.name()
+	
 	def draw(self, paint, sizeX, sizeY):
 		self.sizeX = sizeX
 		self.sizeY = sizeY
 		paint.drawRect(-0.5*self.sizeX,-0.5*self.sizeY, self.sizeX, self.sizeY)
-
 
 if __name__ == "__main__":
 	app = QtGui.QApplication(sys.argv)
