@@ -86,8 +86,18 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="actionOpen_Wafer"/>
+    <addaction name="actionNew_Wafer"/>
+    <addaction name="actionSave_Wafer"/>
+    <addaction name="actionSaveAs_Wafer"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
@@ -110,22 +120,6 @@
    <addaction name="actionDevices"/>
    <addaction name="actionChannels"/>
   </widget>
-  <action name="actionNewWafer">
-   <property name="icon">
-    <iconset theme="document-new">
-     <normaloff/>
-    </iconset>
-   </property>
-   <property name="text">
-    <string>New Wafer</string>
-   </property>
-   <property name="toolTip">
-    <string>Create a New Wafer</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+N</string>
-   </property>
-  </action>
   <action name="actionDeposition">
    <property name="icon">
     <iconset theme="document-properties">
@@ -160,6 +154,38 @@
    </property>
    <property name="text">
     <string>Channels</string>
+   </property>
+  </action>
+  <action name="actionOpen_Wafer">
+   <property name="text">
+    <string>Open Wafer</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionNew_Wafer">
+   <property name="text">
+    <string>New Wafer</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="actionSave_Wafer">
+   <property name="text">
+    <string>Save Wafer</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionSaveAs_Wafer">
+   <property name="text">
+    <string>Save Wafer As</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+S</string>
    </property>
   </action>
  </widget>

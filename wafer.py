@@ -1,6 +1,11 @@
+#!/usr/bin/python
+
 import sys
 from PyQt4 import QtGui, QtCore, uic
 import xml.etree.cElementTree as et
+
+def str2bool(v):
+  return v.lower() in ("yes", "true", "t", "1")
 
 class MainApp(QtGui.QMainWindow):
 	def __init__(self):
@@ -10,7 +15,8 @@ class MainApp(QtGui.QMainWindow):
 		self.waferInspector  = uic.loadUi('waferProperties.ui')
 		self.dieInspector    = uic.loadUi('dieProperties.ui')
 		self.sampleInspector = uic.loadUi('sampleProperties.ui')
-		self.waferDisplay    = DrawWafer(controller              = self)
+		self.waferDisplay    = DrawWafer(controller = self)
+		self.filename        = ""
 
 		# Load inspectors
 		self.inspectorStack = QtGui.QStackedWidget()
@@ -36,10 +42,15 @@ class MainApp(QtGui.QMainWindow):
 		self.ui.showSamples.stateChanged.connect(self.waferDisplay.repaint)
 		self.ui.showAnnealing.stateChanged.connect(self.waferDisplay.repaint)
 
+		# self.ui.actionSave_Wafer.triggered.connect(self.waferDisplay.waf.generateXML)
+		self.ui.actionSave_Wafer.triggered.connect(self.save)
+		self.ui.actionSaveAs_Wafer.triggered.connect(self.saveAs)
+		self.ui.actionOpen_Wafer.triggered.connect(self.open)
+
 		#------------------------------------------------------------------
 		# Connect the relevant ports to methods for setting object data
 		#------------------------------------------------------------------
-           
+		   
 		# Wafer Inspector
 		self.waferInspector.waferName.textChanged.connect(self.changeWaferName)
 		self.waferInspector.waferSubstrate.textChanged.connect(self.changeWaferSubstrate)
@@ -49,6 +60,8 @@ class MainApp(QtGui.QMainWindow):
 		self.dieInspector.dieAnnealTemp.valueChanged.connect(self.changeDieTemp)
 		self.dieInspector.dieAnnealTemp.valueChanged.connect(self.waferDisplay.repaint)
 		self.dieInspector.dieAnnealTime.valueChanged.connect(self.changeDieTime)
+		self.dieInspector.dieDead.stateChanged.connect(self.changeDieDead)
+		self.dieInspector.dieDead.stateChanged.connect(self.waferDisplay.repaint)
 		self.dieInspector.dieNotes.textChanged.connect(self.changeDieNotes)
 
 		# Sample Inspector
@@ -75,6 +88,7 @@ class MainApp(QtGui.QMainWindow):
 			self.dieInspector.dieAnnealTemp.setValue(self.currentSelection.annealTemp)
 			self.dieInspector.dieAnnealTime.setValue(self.currentSelection.annealTime)
 			self.dieInspector.dieNotes.setText(self.currentSelection.notes)
+			self.dieInspector.dieDead.setChecked(2 if self.currentSelection.dead else 0)
 			self.dieInspector.dieName.setText("Row %d, Col %d" % (self.currentSelection.row+1, self.currentSelection.col+1))
 		elif isinstance(self.currentSelection, Wafer):
 			self.inspectorStack.setCurrentIndex(0)
@@ -101,6 +115,7 @@ class MainApp(QtGui.QMainWindow):
 	# Wafer
 	def changeWaferName(self, string):
 		self.currentSelection.name = string
+		self.ui.setWindowTitle(string)
 	def changeWaferSubstrate(self, string):
 		self.currentSelection.substrate = string
 	def changeWaferNotes(self):
@@ -113,6 +128,8 @@ class MainApp(QtGui.QMainWindow):
 		self.currentSelection.annealTime = value
 	def changeDieNotes(self):
 		self.currentSelection.notes = self.dieInspector.dieNotes.toPlainText()
+	def changeDieDead(self, value):
+		self.currentSelection.dead = True if value==2 else False
 
 	# Sample
 	def changeSampleResLong(self, value):
@@ -135,12 +152,85 @@ class MainApp(QtGui.QMainWindow):
 	def showingAnnealing(self):
 		return self.showAnnealing
 
+	#------------------------------------------------------------------
+	# File operations
+	#------------------------------------------------------------------
+
+	def save(self):
+		if self.filename == "":
+			filename = QtGui.QFileDialog.getSaveFileName(self, "Save File", "~/", "Wafer Files (*.xml)");
+		else:
+			filename = self.filename
+			tree = self.waferDisplay.waf.generateXML()
+			tree.write(self.filename, encoding="utf-8", xml_declaration=True)
+
+	def saveAs(self):
+		filename = QtGui.QFileDialog.getSaveFileName(self, "Save File As","~/", "Wafer Files (*.xml)");
+		if filename != "":
+			self.filename = filename
+			tree = self.waferDisplay.waf.generateXML()
+			tree.write(self.filename, encoding="utf-8", xml_declaration=True)
+		
+	def open(self):
+		filename = QtGui.QFileDialog.getOpenFileName(self, "Open File","~/", "Wafer Files (*.xml)");
+		if filename != "":
+			self.filename = filename
+			self.parseXML()
+			self.ui.setWindowTitle(self.waferDisplay.waf.name)
+
+	def parseXML(self):
+		tree = et.parse(self.filename)
+		root = tree.getroot()
+		drows = int(root.get("dieRows"))
+		dcols = int(root.get("dieCols"))
+		srows = int(root.get("sampleRows"))
+		scols = int(root.get("sampleCols"))
+
+		self.waferDisplay.waf          = Wafer(drows, dcols, srows, scols, controller=self.waferDisplay.controller)
+		# self.waferDisplay.waf.status   = int(root.get("status"))
+		# self.waferDisplay.waf.dieSpacingX    = float(root.get("dieSpacingX")   ) 
+		# self.waferDisplay.waf.dieSpacingY    = float(root.get("dieSpacingY")   ) 
+		# self.waferDisplay.waf.sampleSpacingX = float(root.get("sampleSpacingX"))
+		# self.waferDisplay.waf.sampleSpacingY = float(root.get("sampleSpacingY"))
+
+		notes = root.text
+		if notes == None:
+			notes = ""
+		self.waferDisplay.waf.notes = notes
+		self.waferDisplay.waf.name  = root.get("name")
+		self.waferDisplay.waf.substrate = root.get("substrate") 
+
+		for i, dierow in enumerate(root.findall('dierow')):
+			for j, die in enumerate(dierow.findall('die')):
+				for item in die.items():
+					name, val = item
+					if val is not None:
+						val = self.waferDisplay.waf.dies[i][j].dataTypes[name](val)
+						setattr(self.waferDisplay.waf.dies[i][j], name, val)
+					notes = die.text
+					if notes == None:
+						notes = ""
+					self.waferDisplay.waf.dies[i][j].notes = notes
+
+				for ii, deviceRow in enumerate(die.findall('deviceRow')):
+					for jj, device in enumerate(deviceRow.findall('device')):
+						for item in device.items():
+							name, val = item
+							if val is not None:
+								val = self.waferDisplay.waf.dies[i][j].samples[ii][jj].dataTypes[name](val)
+								setattr(self.waferDisplay.waf.dies[i][j].samples[ii][jj], name, val)
+							notes = device.text
+							if notes == None:
+								notes = ""
+							self.waferDisplay.waf.dies[i][j].samples[ii][jj].notes = notes
+
+		self.waferDisplay.repaint()
+
 class DrawWafer(QtGui.QWidget):
 	def __init__(self, controller, parent=None):
 		QtGui.QWidget.__init__(self, parent)
 		self.controller = controller
 		self.setGeometry(300, 300, 350, 350)
-		self.setWindowTitle('Draw circles')
 		sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
 		sizePolicy.setHeightForWidth(True)
 		sizePolicy.setWidthForHeight(True)
@@ -197,12 +287,11 @@ class Wafer(QtGui.QWidget):
 		self.name         = ""
 		self.substrate    = ""
 		self.notes        = ""
-		self.status       = -1
 		self.sampleRows   = sampleRows
 		self.sampleCols   = sampleCols
 		self.dieRows      = dieRows
 		self.dieCols      = dieCols
-		self.dies         = [[Die(i, j, dieRows, dieCols, controller=self.controller, parent=self) for j in range(dieCols)] for i in range(dieRows)]
+		self.dies         = [[Die(i, j, sampleRows, sampleCols, controller=self.controller, parent=self) for j in range(dieCols)] for i in range(dieRows)]
 
 	def draw(self, paint, diameter, centerX, centerY):
 		
@@ -233,7 +322,10 @@ class Wafer(QtGui.QWidget):
 				transY = (i-0.5*(self.dieRows-1))*(self.sizeY+self.dieMargin)
 				paint.save()
 				paint.translate(transX, -transY)
-				paint.setBrush(QtCore.Qt.NoBrush)
+				if die.dead:
+					paint.setBrush(QtGui.QColor(100, 100, 100))
+				else:
+					paint.setBrush(QtCore.Qt.NoBrush)
 				paint.setPen(QtCore.Qt.black)
 				die.draw(paint, self.sizeX, self.sizeY)
 				paint.restore()
@@ -253,7 +345,42 @@ class Wafer(QtGui.QWidget):
 						# Return true if we hit anything
 						return True
 		return False
-						
+
+	def generateXML(self):
+		root = et.Element("wafer")
+		root.set("name"   ,        str(self.name))
+		root.text =                str(self.notes)
+		root.set("dieRows",        str(self.dieRows))
+		root.set("dieCols",        str(self.dieCols))
+		root.set("sampleRows"  ,   str(self.sampleRows))
+		root.set("sampleCols"  ,   str(self.sampleCols))
+		root.set("substrate"  ,    str(self.substrate))
+		
+		for i in range(self.dieRows):
+			dierow = et.SubElement(root, "dierow")
+			for j in range(self.dieCols):
+				dieObj = self.dies[i][j]
+				die = et.SubElement(dierow, "die")
+				die.text = str(dieObj.notes)
+				die.set("sampleRows"  ,str(dieObj.sampleRows))
+				die.set("sampleCols"  ,str(dieObj.sampleCols))
+				die.set("annealTemp"  ,str(dieObj.annealTemp))
+				die.set("annealTime"  ,str(dieObj.annealTime))
+				die.set("dead"        ,str(dieObj.dead))
+
+				for ii in range(self.sampleRows):
+					deviceRow = et.SubElement(die, "deviceRow")
+					for jj in range(self.sampleCols):
+						devObj = self.dies[i][j].samples[ii][jj]
+						device = et.SubElement(deviceRow, "device")
+						device.text = str(devObj.notes)
+						device.set("state",str(devObj.state))
+						device.set("dimensions" ,str(devObj.dimensions))
+						device.set("resTrans"   ,str(devObj.resTrans))
+						device.set("resLong"    ,str(devObj.resLong))
+
+		tree = et.ElementTree(root)
+		return tree
 
 class Die(QtGui.QWidget):
 	def __init__(self, thisRow, thisCol, sampleRows, sampleCols, controller=None, parent=None):
@@ -269,6 +396,9 @@ class Die(QtGui.QWidget):
 		self.notes        = ""
 		self.annealTemp   = 0.0
 		self.annealTime   = 0.0
+		self.dead         = False
+		self.dataTypes    = {'notes': str, 'annealTemp': float, 'annealTime': float, 'dead': str2bool,
+							 'sampleRows': int, 'sampleCols': int, }
 
 	def name(self):
 		return "Die(%d,%d)" % (self.row, self.col)
@@ -329,9 +459,11 @@ class Sample(QtGui.QWidget):
 
 		self.notes        = ""
 		self.dimensions   = ""
-		self.resTrans     = 0
-		self.resLong      = 0
+		self.resTrans     = 0.0
+		self.resLong      = 0.0
 		self.state        = 0
+		self.dataTypes    = {'notes': str, 'dimensions': str, 
+							 'resTrans': float, 'resLong': float, 'state': int,}
 
 	def name(self):
 		return "Die(%d,%d) Sample(%d,%d)" % (self.parentRow, self.parentCol, self.row, self.col)

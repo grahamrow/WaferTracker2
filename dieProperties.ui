@@ -31,7 +31,11 @@
     </widget>
    </item>
    <item>
-    <widget class="QLineEdit" name="dieName"/>
+    <widget class="QLineEdit" name="dieName">
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="QLabel" name="label_2">
@@ -73,6 +77,13 @@
     <widget class="QDoubleSpinBox" name="dieAnnealTime">
      <property name="singleStep">
       <double>0.500000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="dieDead">
+     <property name="text">
+      <string>Dead or otherwise useless</string>
      </property>
     </widget>
    </item>
