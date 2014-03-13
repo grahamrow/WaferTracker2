@@ -7,6 +7,14 @@ import xml.etree.cElementTree as et
 def str2bool(v):
   return v.lower() in ("yes", "true", "t", "1")
 
+class NewWaferWindow(QtGui.QDialog): # For configuring the lockin NewWafer
+	def __init__(self, parent=None):
+		super(NewWaferWindow, self).__init__(parent)
+		self.ui  = uic.loadUi("NewWafer.ui")
+
+	def show(self):
+		self.ui.show()
+
 class MainApp(QtGui.QMainWindow):
 	def __init__(self):
 		QtGui.QMainWindow.__init__(self)
@@ -42,10 +50,10 @@ class MainApp(QtGui.QMainWindow):
 		self.ui.showSamples.stateChanged.connect(self.waferDisplay.repaint)
 		self.ui.showAnnealing.stateChanged.connect(self.waferDisplay.repaint)
 
-		# self.ui.actionSave_Wafer.triggered.connect(self.waferDisplay.waf.generateXML)
 		self.ui.actionSave_Wafer.triggered.connect(self.save)
 		self.ui.actionSaveAs_Wafer.triggered.connect(self.saveAs)
 		self.ui.actionOpen_Wafer.triggered.connect(self.open)
+		self.ui.actionNew_Wafer.triggered.connect(self.new)
 
 		#------------------------------------------------------------------
 		# Connect the relevant ports to methods for setting object data
@@ -177,6 +185,12 @@ class MainApp(QtGui.QMainWindow):
 			self.filename = filename
 			self.parseXML()
 			self.ui.setWindowTitle(self.waferDisplay.waf.name)
+
+	def new(self):
+		newWaferWindow = NewWaferWindow(self)
+		newWaferWindow.exit
+		newWaferWindow.show()
+
 
 	def parseXML(self):
 		tree = et.parse(self.filename)
