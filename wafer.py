@@ -9,7 +9,6 @@ import xml.etree.cElementTree as ElementTree
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
-
 class NewWaferWindow(QtGui.QDialog):  # For configuring the lockin NewWafer
     def __init__(self, parent=None):
         super(NewWaferWindow, self).__init__(parent)
@@ -29,7 +28,8 @@ class MainApp(QtGui.QMainWindow):
         self.waferDisplay = DrawWafer(controller=self)
         self.filename = ""
         self.file_types = "Wafer Files (*.xml)"
-        self.currentSelection = None
+        self.currentSelection  = None
+        self.currentSelections = []
 
         # Load inspectors
         self.inspectorStack = QtGui.QStackedWidget()
@@ -93,41 +93,53 @@ class MainApp(QtGui.QMainWindow):
         self.sampleInspector.sampleState.currentIndexChanged.connect(self.waferDisplay.repaint)
 
         # Inspected State, which we rely upon to point to the correct object
-        self.setCurrentSelection(self.waferDisplay.waf)
+        # self.setCurrentSelection(self.waferDisplay.waf)
+        self.currentSelections = [self.waferDisplay.waf]
 
         self.ui.show()
+    #
+    # def getCurrentSelection(self):
+    #     return self.currentSelection
 
-    def getCurrentSelection(self):
-        return self.currentSelection
-
-    def setCurrentSelection(self, selection):
-        """Set the correct inspector"""
-        self.currentSelection = selection
-        if isinstance(self.currentSelection, Die):
-            self.inspectorStack.setCurrentIndex(1)
-            self.dieInspector.dieAnnealTemp.setValue(self.currentSelection.annealTemp)
-            self.dieInspector.dieAnnealTime.setValue(self.currentSelection.annealTime)
-            self.dieInspector.dieNotes.setText(self.currentSelection.notes)
-            self.dieInspector.dieDead.setChecked(2 if self.currentSelection.dead else 0)
-            self.dieInspector.dieName.setText(
-                "Row %d, Col %d" % (self.currentSelection.row + 1, self.currentSelection.col + 1))
-        elif isinstance(self.currentSelection, Wafer):
-            self.inspectorStack.setCurrentIndex(0)
-            self.waferInspector.waferName.setText(self.currentSelection.name)
-            self.waferInspector.waferSubstrate.setText(self.currentSelection.substrate)
-            self.waferInspector.waferNotes.setText(self.currentSelection.notes)
-        elif isinstance(self.currentSelection, Sample):
-            self.inspectorStack.setCurrentIndex(2)
-            self.sampleInspector.sampleResTrans.setValue(self.currentSelection.resTrans)
-            self.sampleInspector.sampleResLong.setValue(self.currentSelection.resLong)
-            self.sampleInspector.sampleState.setCurrentIndex(self.currentSelection.state)
-            self.sampleInspector.sampleName.setText("Die Row %d, Col %d : Sample Row %d, Col %d" % (
-                self.currentSelection.parentRow + 1, self.currentSelection.parentCol + 1, self.currentSelection.row + 1,
-                self.currentSelection.col + 1))
-            self.sampleInspector.sampleNotes.setText(self.currentSelection.notes)
-            self.sampleInspector.sampleDimensions.setText(self.currentSelection.dimensions)
+    def setSelection(self, selection, append=False):
+        if len(self.currentSelections) == 0 or not append:
+            self.currentSelections = [selection]
         else:
-            raise Exception("Invalid Inspector")
+            # Add to the selection only if the selection is of the same type
+            # This seems like a reasonable way to use "type"... no inheritance to deal with
+            if type(self.currentSelections[0]) == type(selection):
+                self.currentSelections.append(selection)
+            else:
+                self.currentSelections = [selection]
+            self.waferDisplay.repaint()
+
+        if len(self.currentSelections) == 1:
+            if isinstance(self.currentSelections[0], Die):
+                self.inspectorStack.setCurrentIndex(1)
+                self.dieInspector.dieAnnealTemp.setValue(self.currentSelections[0].annealTemp)
+                self.dieInspector.dieAnnealTime.setValue(self.currentSelections[0].annealTime)
+                self.dieInspector.dieNotes.setText(self.currentSelections[0].notes)
+                self.dieInspector.dieDead.setChecked(2 if self.currentSelections[0].dead else 0)
+                self.dieInspector.dieName.setText(
+                    "Row %d, Col %d" % (self.currentSelections[0].row + 1, self.currentSelections[0].col + 1))
+            elif isinstance(self.currentSelections[0], Wafer):
+                self.inspectorStack.setCurrentIndex(0)
+                self.waferInspector.waferName.setText(self.currentSelections[0].name)
+                self.waferInspector.waferSubstrate.setText(self.currentSelections[0].substrate)
+                self.waferInspector.waferNotes.setText(self.currentSelections[0].notes)
+            elif isinstance(self.currentSelections[0], Sample):
+                self.inspectorStack.setCurrentIndex(2)
+                self.sampleInspector.sampleResTrans.setValue(self.currentSelections[0].resTrans)
+                self.sampleInspector.sampleResLong.setValue(self.currentSelections[0].resLong)
+                self.sampleInspector.sampleState.setCurrentIndex(self.currentSelections[0].state)
+                self.sampleInspector.sampleName.setText("Die Row %d, Col %d : Sample Row %d, Col %d" % (
+                    self.currentSelections[0].parentRow + 1, self.currentSelections[0].parentCol + 1, self.currentSelections[0].row + 1,
+                    self.currentSelections[0].col + 1))
+                self.sampleInspector.sampleNotes.setText(self.currentSelections[0].notes)
+                self.sampleInspector.sampleDimensions.setText(self.currentSelections[0].dimensions)
+            else:
+                raise Exception("Invalid Inspector")
+
         self.waferDisplay.repaint()
 
     #------------------------------------------------------------------
@@ -136,43 +148,52 @@ class MainApp(QtGui.QMainWindow):
 
     # Wafer
     def changeWaferName(self, string):
-        self.currentSelection.name = string
+        self.currentSelections[0].name = string
         self.ui.setWindowTitle(string)
 
     def changeWaferSubstrate(self, string):
-        self.currentSelection.substrate = string
+        self.currentSelections[0].substrate = string
 
     def changeWaferNotes(self):
-        self.currentSelection.notes = self.waferInspector.waferNotes.toPlainText()
+        self.currentSelections[0].notes = self.waferInspector.waferNotes.toPlainText()
 
     # Die
     def changeDieTemp(self, value):
-        self.currentSelection.annealTemp = value
+        for sel in self.currentSelections:
+            sel.annealTemp = value
 
     def changeDieTime(self, value):
-        self.currentSelection.annealTime = value
+        for sel in self.currentSelections:
+            sel.annealTime = value
 
     def changeDieNotes(self):
-        self.currentSelection.notes = self.dieInspector.dieNotes.toPlainText()
+        for sel in self.currentSelections:
+            sel.notes = self.dieInspector.dieNotes.toPlainText()
 
     def changeDieDead(self, value):
-        self.currentSelection.dead = True if value == 2 else False
+        for sel in self.currentSelections:
+            sel.dead = True if value == 2 else False
 
     # Sample
     def changeSampleResLong(self, value):
-        self.currentSelection.resLong = value
+        for sel in self.currentSelections:
+            sel.resLong = value
 
     def changeSampleResTrans(self, value):
-        self.currentSelection.resTrans = value
+        for sel in self.currentSelections:
+            sel.resTrans = value
 
     def changeSampleNotes(self):
-        self.currentSelection.notes = self.sampleInspector.sampleNotes.toPlainText()
+        for sel in self.currentSelections:
+            sel.notes = self.sampleInspector.sampleNotes.toPlainText()
 
     def changeSampleDimensions(self, string):
-        self.currentSelection.dimensions = string
+        for sel in self.currentSelections:
+            sel.dimensions = string
 
     def changeSampleState(self, value):
-        self.currentSelection.state = value
+        for sel in self.currentSelections:
+            sel.state = value
 
     def setShowSamples(self, value):
         self.showSamples = value
@@ -212,7 +233,7 @@ class MainApp(QtGui.QMainWindow):
             self.filename = filename
             self.parseXML()
             self.ui.setWindowTitle(self.waferDisplay.waf.name)
-            self.setCurrentSelection(self.waferDisplay.waf)
+            self.setSelection(self.waferDisplay.waf)
 
     def new(self):
         name  = self.new_wafer_window.ui.waferName.text()
@@ -299,10 +320,6 @@ class DrawWafer(QtGui.QWidget):
         paint.begin(self)
         paint.setRenderHint(QtGui.QPainter.Antialiasing)
 
-        # Background
-        # paint.setBrush(QtCore.Qt.white)
-        # paint.drawRect(event.rect())
-
         # Dimensions
         w = self.size().width()
         h = self.size().height()
@@ -324,13 +341,11 @@ class DrawWafer(QtGui.QWidget):
 
     def mousePressEvent(self, event):
         super(DrawWafer, self).mousePressEvent(event)
-        position = QtCore.QPointF(event.pos())
         if not self.waf.checkMousePressEvent(event, self.centerX, self.centerY):
-            self.controller.setCurrentSelection(self.waf)
+            self.controller.setSelection(self.waf)
 
     def wheelEvent(self, event):
         zoom = 1.0 + event.delta()/2400.0
-        print self.size().width()*zoom, self.minimumWidth(), self.size().height()*zoom, self.minimumHeight()
         if (self.size().width()*zoom > 300) and (self.size().height()*zoom > 300):
             self.setFixedSize(self.size().width()*zoom, self.size().height()*zoom)
             self.repaint()
@@ -360,10 +375,12 @@ class Wafer(QtGui.QWidget):
         grad.setColorAt(.5, QtGui.QColor(217, 226, 255))
         grad.setColorAt(.25, QtGui.QColor(191, 255, 255))
         paint.setBrush(grad)
-        if self.controller.getCurrentSelection() == self:
+
+        if self in self.controller.currentSelections:
             thickness = 1.5
         else:
             thickness = 0.5
+
         pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
         paint.setPen(pen)
         paint.drawChord(boundingRect, 290 * 16, 320 * 16)
@@ -383,7 +400,6 @@ class Wafer(QtGui.QWidget):
                     paint.setBrush(QtGui.QColor(100, 100, 100))
                 else:
                     paint.setBrush(QtCore.Qt.NoBrush)
-                paint.setPen(QtCore.Qt.black)
                 die.draw(paint, self.sizeX, self.sizeY)
                 paint.restore()
 
@@ -397,10 +413,9 @@ class Wafer(QtGui.QWidget):
                 if (-0.5 * self.sizeX <= eventX - transX <= 0.5 * self.sizeX):
                     if (-0.5 * self.sizeY <= eventY - transY <= 0.5 * self.sizeY):
                         # Check to see if we hit a die too
-                        if not self.dies[i][j].checkMousePressEvent(eventX - transX, eventY - transY):
-                            self.controller.setCurrentSelection(self.dies[i][j])
-                            if event.button() == QtCore.Qt.RightButton:
-                                pass
+                        if not self.dies[i][j].checkMousePressEvent(event, eventX - transX, eventY - transY):
+                            doAppend = (event.modifiers() == QtCore.Qt.ShiftModifier)
+                            self.controller.setSelection(self.dies[i][j], append=doAppend)
                         # Return true if we hit anything
                         return True
         return False
@@ -473,20 +488,25 @@ class Die(QtGui.QWidget):
         # Draw the die
         self.sizeX = sizeX
         self.sizeY = sizeY
-        if self.controller.getCurrentSelection() == self:
+        if self in self.controller.currentSelections:
             thickness = 1.5
         else:
             thickness = 0.5
-        pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
+
+        if self.notes != "":
+            pen = QtGui.QPen(QtCore.Qt.blue, thickness, QtCore.Qt.SolidLine)
+        else:
+            pen = QtGui.QPen(QtCore.Qt.black, thickness, QtCore.Qt.SolidLine)
+
         paint.setPen(pen)
         if self.annealTemp > 150 and self.controller.showingAnnealing():
             brush = QtGui.QColor()
             temp = self.annealTemp
             if temp > 600.0:
                 temp = 600.0
-
             brush.setHsvF(0.75 + 0.25 * temp / 600.0, 1.0, 1.0)
             paint.setBrush(brush)
+
         paint.drawRect(-0.5 * self.sizeX, -0.5 * self.sizeY, self.sizeX, self.sizeY)
 
         # Draw the devices
@@ -506,7 +526,7 @@ class Die(QtGui.QWidget):
                 dev.draw(paint, self.sizeX, self.sizeY)
                 paint.restore()
 
-    def checkMousePressEvent(self, eventX, eventY):
+    def checkMousePressEvent(self, event, eventX, eventY):
         if self.controller.showingSamples():
             for i, row in enumerate(self.samples):
                 for j, die in enumerate(row):
@@ -514,7 +534,8 @@ class Die(QtGui.QWidget):
                     transY = (i - 0.5 * (self.sampleRows - 1)) * (self.sizeY + self.sampleMargin)
                     if (-0.5 * self.sizeX <= eventX - transX <= 0.5 * self.sizeX):
                         if (-0.5 * self.sizeY <= eventY - transY <= 0.5 * self.sizeY):
-                            self.controller.setCurrentSelection(self.samples[i][j])
+                            doAppend = (event.modifiers() == QtCore.Qt.ShiftModifier)
+                            self.controller.setSelection(self.samples[i][j], append=doAppend)
                             return True
         return False
 
@@ -556,10 +577,9 @@ class Sample(QtGui.QWidget):
             elif self.state == 4:
                 brush = QtGui.QColor(255, 50, 50)
             else:
-                # brush = QtGui.QColor(250, 250, 250)
                 brush = QtCore.Qt.NoBrush
             paint.setBrush(brush)
-            if self.controller.getCurrentSelection() == self:
+            if self in self.controller.currentSelections:
                 thickness = 1.5
             else:
                 thickness = 0.5
